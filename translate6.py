@@ -1,11 +1,13 @@
 import tensorflow as tf
 import pandas as pd
 import numpy as np
+import sklearn
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from imblearn.over_sampling import SMOTE
+import matplotlib.pyplot as plt
 
-
+SHOW_TRAINING_GRAPHS = False
 
 def main():
     #Load raw data
@@ -14,24 +16,63 @@ def main():
     #Separating X and Y data
     x, y = getXYdata(rawData)
 
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.25, stratify=y)
+    #Making train and test data
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.15, stratify=y)
+ 
     scaler = StandardScaler()
     x_train = pd.DataFrame(scaler.fit_transform(x_train))
     x_test = pd.DataFrame(scaler.fit_transform(x_test))
 
     sm = SMOTE(random_state = 2)
     x_train_res, y_train_res = sm.fit_resample(x_train, y_train)
+ 
 
+    #Make model
     model = tf.keras.Sequential([
-        tf.keras.layers.Dense(128, input_dim=20, activation='relu'),
-        tf.keras.layers.Dense(64, activation='relu'),
+        tf.keras.layers.Dense(512, input_dim=20, activation='relu'),
+        tf.keras.layers.Dense(256, activation='relu'),
         tf.keras.layers.Dropout(0.3),
-        tf.keras.layers.Dense(32, activation='relu'),
-        tf.keras.layers.Dense(20, activation='softmax'),
+        tf.keras.layers.Dense(128, activation='relu'),
+        tf.keras.layers.Dense(67, activation='softmax'),
     ])
 
+    #Compile model
     model.compile(loss='categorical_crossentropy', optimizer='sgd', metrics='accuracy')
 
+    #Encode Y to one-hot
+    y_train_enc = pd.get_dummies(y_train_res)
+    
+    #Train model :)
+    modelX = model.fit(x_train_res, y_train_enc, epochs=10, validation_split=0.2)
+    
+    #Graphs
+    if SHOW_TRAINING_GRAPHS==True:
+        plt.plot(x.history['accuracy'])
+        plt.plot(x.history['val_accuracy'])
+        plt.show()
+
+    #Prediction
+    aaa = ["futbol", "football", "nogomet"]
+    bbb = np.zeros((3,20))
+    for i in range(3):
+        bbb[i] = normalize(aaa[i])
+    accuracy = model.predict(bbb)
+    print('Test accuracy :', accuracy[0])
+
+    y_pred = accuracy[0]
+    y_pred = np.argmax(y_pred, axis=-1)
+
+    y_pred_enc = pd.get_dummies(y_pred)
+    y_test_enc = pd.get_dummies(y_test)
+    tfDataIndex = tf.math.argmax(input = accuracy[0])
+    index = tf.keras.backend.eval(tfDataIndex)
+    print("index: ", index)
+    xxx = y_train_res.to_numpy()
+
+    print(len(xxx))
+    for word in xxx:
+        if word[0]==index*len(accuracy[0]):
+            print(word[1])
 
 
 def normalize(word):
